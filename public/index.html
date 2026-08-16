@@ -1,1 +1,62 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Treo Voice Cố Định</title>
+    <style>
+        body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; display: flex; justify-content: center; }
+        .card { background: #1e293b; padding: 25px; border-radius: 8px; width: 100%; max-width: 600px; }
+        .alert { background: #450a0a; color: #fca5a5; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input[type="text"] { width: 100%; padding: 10px; margin-top: 5px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 4px; box-sizing: border-box; }
+        .switches { display: flex; gap: 20px; margin: 20px 0; }
+        button { width: 100%; padding: 12px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #1d4ed8; }
+        #status { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Treo Voice Cố Định 24/7</h2>
+        <div class="alert">⚠️ CẢNH BÁO: Việc dùng User Token có nguy cơ bị Discord quét. Bắt buộc nên bật Tự Mute và Tự Deaf!</div>
+        
+        <label>Token Tài Khoản Discord</label>
+        <input type="text" id="token" placeholder="Nhập User Token...">
 
+        <label>ID Kênh Thoại (Voice Channel ID)</label>
+        <input type="text" id="channelId" placeholder="VD: 1530967867481395213">
+
+        <div class="switches">
+            <label><input type="checkbox" id="selfMute" checked> Tự Mute</label>
+            <label><input type="checkbox" id="selfDeaf" checked> Tự Deaf</label>
+        </div>
+
+        <button onclick="submitConfig()">Lưu và Tải lại cấu hình</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        async function submitConfig() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#334155';
+            statusDiv.innerText = 'Đang gửi yêu cầu...';
+
+            const res = await fetch('/api/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: document.getElementById('token').value.trim(),
+                    channelId: document.getElementById('channelId').value.trim(),
+                    selfMute: document.getElementById('selfMute').checked,
+                    selfDeaf: document.getElementById('selfDeaf').checked
+                })
+            });
+
+            const data = await res.json();
+            statusDiv.style.background = data.success ? '#064e3b' : '#7f1d1d';
+            statusDiv.innerText = data.message;
+        }
+    </script>
+</body>
+</html>
