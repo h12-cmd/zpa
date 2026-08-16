@@ -7,7 +7,8 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-let currentClient = null;
+// Lưu trữ danh sách nhiều tài khoản đang kết nối
+const activeClients = new Map();
 
 app.post('/api/connect', async (req, res) => {
     const { token, channelId, selfMute, selfDeaf } = req.body;
@@ -16,9 +17,10 @@ app.post('/api/connect', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Vui lòng nhập đầy đủ Token và ID Kênh!' });
     }
 
-    if (currentClient) {
-        try { currentClient.destroy(); } catch (e) {}
-        currentClient = null;
+    // Nếu Token này đã kết nối từ trước, ngắt kết nối cũ để tạo kết nối mới
+    if (activeClients.has(token)) {
+        try { activeClients.get(token).destroy(); } catch (e) {}
+        activeClients.delete(token);
     }
 
     const client = new Client();
@@ -27,7 +29,8 @@ app.post('/api/connect', async (req, res) => {
         try {
             const channel = await client.channels.fetch(channelId);
             if (!channel || !channel.isVoice()) {
-                return res.status(400).json({ success: false, message: 'ID kênh thoại không đúng!' });
+                client.destroy();
+                return res.status(400).json({ success: false, message: 'ID kênh thoại không đúng hoặc không phải kênh Voice!' });
             }
 
             joinVoiceChannel({
@@ -38,19 +41,35 @@ app.post('/api/connect', async (req, res) => {
                 selfDeaf: Boolean(selfDeaf),
             });
 
-            return res.json({ success: true, message: `Đã treo voice thành công trong kênh: ${channel.name}` });
+            activeClients.set(token, client);
+
+            return res.json({ 
+                success: true, 
+                message: `[${client.user.tag}] Đã treo voice thành công vào kênh: ${channel.name}` 
+            });
         } catch (err) {
-            return res.status(500).json({ success: false, message: `Lỗi: ${err.message}` });
+            client.destroy();
+            return res.status(500).json({ success: false, message: `Lỗi kết nối: ${err.message}` });
         }
     });
 
     try {
         await client.login(token);
-        currentClient = client;
     } catch (err) {
-        return res.status(400).json({ success: false, message: 'Token không hợp lệ hoặc sai định dạng!' });
+        return res.status(400).json({ success: false, message: 'Token không hợp lệ hoặc đã bị đổi mật khẩu!' });
     }
 });
 
-const PORT = process.env.PORT || 3000;
+// API hỗ trợ ngắt kết nối từng tài khoản
+app.post('/api/disconnect', (req, res) => {
+    const { token } = req.body;
+    if (activeClients.has(token)) {
+        try { activeClients.get(token).destroy(); } catch (e) {}
+        activeClients.delete(token);
+        return res.json({ success: true, message: 'Đã ngắt kết nối voice thành công!' });
+    }
+    return res.status(400).json({ success: false, message: 'Tài khoản này chưa treo voice trên hệ thống!' });
+});
+
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Server đang chạy tại port ${PORT}`));
