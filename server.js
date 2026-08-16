@@ -7,22 +7,18 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Lưu trữ danh sách client kèm thông tin phụ trợ
 const activeClients = new Map();
 
-// Chuyển hướng /check sang trang check.html
 app.get('/check', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'check.html'));
 });
 
-// API lấy danh sách tài khoản đang treo (Đã che thông tin nhạy cảm)
 app.get('/api/status', (req, res) => {
     const activeList = [];
 
     activeClients.forEach((data) => {
         const username = data.client.user ? data.client.user.username : 'Unknown';
         
-        // Thuật toán che tên (VD: "Kenz" -> "K***z", "An" -> "A*")
         let maskedName = '***';
         if (username.length <= 2) {
             maskedName = username[0] + '*';
@@ -64,16 +60,18 @@ app.post('/api/connect', async (req, res) => {
                 return res.status(400).json({ success: false, message: 'ID kênh thoại không hợp lệ!' });
             }
 
-            // Bật Mute/Deaf trực tiếp qua WebSocket
-            client.ws.send({
-                op: 4,
-                d: {
-                    guild_id: channel.guild.id,
-                    channel_id: channel.id,
-                    self_mute: Boolean(selfMute),
-                    self_deaf: Boolean(selfDeaf)
-                }
-            });
+            // Gửi Opcode 4 chuẩn qua Shard
+            if (client.ws.shards && client.ws.shards.first()) {
+                client.ws.shards.first().send({
+                    op: 4,
+                    d: {
+                        guild_id: channel.guild.id,
+                        channel_id: channel.id,
+                        self_mute: Boolean(selfMute),
+                        self_deaf: Boolean(selfDeaf)
+                    }
+                });
+            }
 
             joinVoiceChannel({
                 channelId: channel.id,
