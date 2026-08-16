@@ -7,8 +7,40 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Lưu trữ danh sách nhiều tài khoản đang kết nối
+// Lưu trữ danh sách client kèm thông tin phụ trợ
 const activeClients = new Map();
+
+// Chuyển hướng /check sang trang check.html
+app.get('/check', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'check.html'));
+});
+
+// API lấy danh sách tài khoản đang treo (Đã che thông tin nhạy cảm)
+app.get('/api/status', (req, res) => {
+    const activeList = [];
+
+    activeClients.forEach((data) => {
+        const username = data.client.user ? data.client.user.username : 'Unknown';
+        
+        // Thuật toán che tên (VD: "Kenz" -> "K***z", "An" -> "A*")
+        let maskedName = '***';
+        if (username.length <= 2) {
+            maskedName = username[0] + '*';
+        } else {
+            maskedName = username[0] + '***' + username[username.length - 1];
+        }
+
+        activeList.push({
+            name: maskedName,
+            connectedAt: data.connectedAt
+        });
+    });
+
+    res.json({
+        total: activeList.length,
+        accounts: activeList
+    });
+});
 
 app.post('/api/connect', async (req, res) => {
     const { token, channelId, selfMute, selfDeaf } = req.body;
@@ -17,9 +49,8 @@ app.post('/api/connect', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Vui lòng nhập đầy đủ Token và ID Kênh!' });
     }
 
-    // Nếu Token này đã kết nối từ trước, ngắt kết nối cũ để tạo kết nối mới
     if (activeClients.has(token)) {
-        try { activeClients.get(token).destroy(); } catch (e) {}
+        try { activeClients.get(token).client.destroy(); } catch (e) {}
         activeClients.delete(token);
     }
 
@@ -30,8 +61,19 @@ app.post('/api/connect', async (req, res) => {
             const channel = await client.channels.fetch(channelId);
             if (!channel || !channel.isVoice()) {
                 client.destroy();
-                return res.status(400).json({ success: false, message: 'ID kênh thoại không đúng hoặc không phải kênh Voice!' });
+                return res.status(400).json({ success: false, message: 'ID kênh thoại không hợp lệ!' });
             }
+
+            // Bật Mute/Deaf trực tiếp qua WebSocket
+            client.ws.send({
+                op: 4,
+                d: {
+                    guild_id: channel.guild.id,
+                    channel_id: channel.id,
+                    self_mute: Boolean(selfMute),
+                    self_deaf: Boolean(selfDeaf)
+                }
+            });
 
             joinVoiceChannel({
                 channelId: channel.id,
@@ -41,7 +83,10 @@ app.post('/api/connect', async (req, res) => {
                 selfDeaf: Boolean(selfDeaf),
             });
 
-            activeClients.set(token, client);
+            activeClients.set(token, {
+                client: client,
+                connectedAt: Date.now()
+            });
 
             return res.json({ 
                 success: true, 
@@ -56,19 +101,18 @@ app.post('/api/connect', async (req, res) => {
     try {
         await client.login(token);
     } catch (err) {
-        return res.status(400).json({ success: false, message: 'Token không hợp lệ hoặc đã bị đổi mật khẩu!' });
+        return res.status(400).json({ success: false, message: 'Token không hợp lệ hoặc đã hết hạn!' });
     }
 });
 
-// API hỗ trợ ngắt kết nối từng tài khoản
 app.post('/api/disconnect', (req, res) => {
     const { token } = req.body;
     if (activeClients.has(token)) {
-        try { activeClients.get(token).destroy(); } catch (e) {}
+        try { activeClients.get(token).client.destroy(); } catch (e) {}
         activeClients.delete(token);
         return res.json({ success: true, message: 'Đã ngắt kết nối voice thành công!' });
     }
-    return res.status(400).json({ success: false, message: 'Tài khoản này chưa treo voice trên hệ thống!' });
+    return res.status(400).json({ success: false, message: 'Tài khoản này chưa kết nối!' });
 });
 
 const PORT = process.env.PORT || 10000;
