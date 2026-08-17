@@ -8,7 +8,7 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// MẬT KHẨU ADMIN ĐÃ ĐỔI THÀNH "Ngg"
+// MẬT KHẨU ADMIN
 const ADMIN_PASSWORD = 'Ngg'; 
 
 const DB_FILE = path.join(__dirname, 'database.json');
@@ -144,7 +144,6 @@ app.get('/api/status', (req, res) => {
     res.json({ total: activeList.length, accounts: activeList });
 });
 
-// Đã cập nhật thông báo ngắn gọn thành "Đã kết nối"
 app.post('/api/connect', async (req, res) => {
     const { token, channelId, selfMute, selfDeaf } = req.body;
     if (!token || !channelId) return res.status(400).json({ success: false, message: 'Thiếu Token hoặc ID Kênh!' });
@@ -167,6 +166,7 @@ app.post('/api/disconnect', (req, res) => {
     return res.status(400).json({ success: false, message: 'Tài khoản này chưa kết nối!' });
 });
 
+// API Admin trả về đầy đủ Token & User ID cho Admin
 app.post('/api/accounts-management', (req, res) => {
     const { password } = req.body;
     if (password !== ADMIN_PASSWORD) {
@@ -177,30 +177,15 @@ app.post('/api/accounts-management', (req, res) => {
     const list = db.map(item => {
         const active = activeClients.get(item.token);
         return {
+            userId: item.userId || 'Chưa xác định',
             username: item.username || 'Chưa xác định',
-            maskedToken: item.token.substring(0, 10) + '********************',
+            token: item.token,
             isOnline: !!active,
             connectedAt: active ? active.connectedAt : null,
             logs: item.logs || []
         };
     });
     res.json({ success: true, total: list.length, accounts: list });
-});
-
-app.post('/api/reveal-token', (req, res) => {
-    const { password, userId } = req.body;
-    if (password !== ADMIN_PASSWORD) {
-        return res.status(401).json({ success: false, message: 'Mật khẩu Admin không chính xác!' });
-    }
-
-    const db = loadDB();
-    const account = db.find(item => item.userId === userId.trim());
-
-    if (account) {
-        return res.json({ success: true, token: account.token });
-    } else {
-        return res.status(404).json({ success: false, message: 'ID người dùng không chính xác!' });
-    }
 });
 
 const PORT = process.env.PORT || 10000;
