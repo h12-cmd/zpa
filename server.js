@@ -8,27 +8,21 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// MẬT KHẨU ADMIN (Đổi mật khẩu tùy ý tại đây)
+const ADMIN_PASSWORD = 'admin123'; 
+
 const DB_FILE = path.join(__dirname, 'database.json');
 const activeClients = new Map();
 
-// Hàm đọc Database
 function loadDB() {
     if (!fs.existsSync(DB_FILE)) return [];
-    try {
-        return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    } catch (e) {
-        return [];
-    }
+    try { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (e) { return []; }
 }
 
-// Hàm lưu Database
 function saveDB(data) {
-    try {
-        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-    } catch (e) {}
+    try { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); } catch (e) {}
 }
 
-// Hàm ghi log lỗi/trạng thái cho từng tài khoản
 function addLog(token, message) {
     let db = loadDB();
     const index = db.findIndex(item => item.token === token);
@@ -37,13 +31,12 @@ function addLog(token, message) {
 
     if (index !== -1) {
         if (!db[index].logs) db[index].logs = [];
-        db[index].logs.unshift(logEntry); // Đưa log mới nhất lên đầu
-        if (db[index].logs.length > 20) db[index].logs.pop(); // Giới hạn 20 log
+        db[index].logs.unshift(logEntry);
+        if (db[index].logs.length > 20) db[index].logs.pop();
         saveDB(db);
     }
 }
 
-// Hàm kết nối Voice
 async function connectVoice(config) {
     const { token, channelId, selfMute, selfDeaf } = config;
 
@@ -58,12 +51,11 @@ async function connectVoice(config) {
         try {
             const channel = await client.channels.fetch(channelId);
             if (!channel || !channel.isVoice()) {
-                addLog(token, 'Lỗi: ID kênh thoại không hợp lệ hoặc không phải kênh Voice!');
+                addLog(token, 'Lỗi: ID kênh thoại không hợp lệ!');
                 client.destroy();
                 return;
             }
 
-            // Gửi Opcode 4
             if (client.ws.shards && client.ws.shards.first()) {
                 client.ws.shards.first().send({
                     op: 4,
@@ -84,9 +76,8 @@ async function connectVoice(config) {
                 selfDeaf: Boolean(selfDeaf),
             });
 
-            // Tự động kết nối lại khi mất mạng
             connection.on(VoiceConnectionStatus.Disconnected, async () => {
-                addLog(token, 'Cảnh báo: Mất kết nối Voice tạm thời, đang thử kết nối lại...');
+                addLog(token, 'Cảnh báo: Mất kết nối Voice, đang thử lại...');
                 try {
                     await Promise.race([
                         entersState(connection, VoiceConnectionStatus.Signalling, 5000),
@@ -94,7 +85,7 @@ async function connectVoice(config) {
                     ]);
                 } catch (e) {
                     try { connection.destroy(); } catch (err) {}
-                    addLog(token, 'Lỗi: Thử kết nối lại thất bại. Tiến hành tạo lại phiên làm việc sau 5s...');
+                    addLog(token, 'Lỗi: Thử lại thất bại. Đang tạo lại phiên sau 5s...');
                     setTimeout(() => connectVoice(config), 5000);
                 }
             });
@@ -104,7 +95,6 @@ async function connectVoice(config) {
                 connectedAt: Date.now()
             });
 
-            // Cập nhật thông tin vào Database
             let db = loadDB();
             const index = db.findIndex(item => item.token === token);
             const accountData = {
@@ -118,14 +108,11 @@ async function connectVoice(config) {
                 logs: index !== -1 && db[index].logs ? db[index].logs : []
             };
 
-            if (index !== -1) {
-                db[index] = accountData;
-            } else {
-                db.push(accountData);
-            }
+            if (index !== -1) db[index] = accountData;
+            else db.push(accountData);
             saveDB(db);
 
-            addLog(token, `Thành công: Đã kết nối vào phòng thoại [${channel.name}]`);
+            addLog(token, `Thành công: Đã kết nối vào phòng [${channel.name}]`);
 
         } catch (err) {
             addLog(token, `Lỗi kết nối: ${err.message}`);
@@ -135,7 +122,7 @@ async function connectVoice(config) {
     try {
         await client.login(token);
     } catch (err) {
-        addLog(token, `Lỗi đăng nhập: Token không hợp lệ hoặc đã hết hạn (${err.message})`);
+        addLog(token, `Lỗi đăng nhập: Token hỏng hoặc đổi pass (${err.message})`);
     }
 }
 
@@ -144,11 +131,10 @@ function restoreAllSessions() {
     db.forEach(config => connectVoice(config));
 }
 
-// Router chuyển hướng
 app.get('/check', (req, res) => res.sendFile(path.join(__dirname, 'public', 'check.html')));
 app.get('/taikhoan', (req, res) => res.sendFile(path.join(__dirname, 'public', 'taikhoan.html')));
 
-// API công khai công khai (/check)
+// API Công khai
 app.get('/api/status', (req, res) => {
     const activeList = [];
     activeClients.forEach((data) => {
@@ -159,43 +145,13 @@ app.get('/api/status', (req, res) => {
     res.json({ total: activeList.length, accounts: activeList });
 });
 
-// API Quản lý tài khoản (/taikhoan)
-app.get('/api/accounts-management', (req, res) => {
-    const db = loadDB();
-    const list = db.map(item => {
-        const active = activeClients.get(item.token);
-        return {
-            username: item.username || 'Chưa xác định',
-            maskedToken: item.token.substring(0, 10) + '********************',
-            isOnline: !!active,
-            connectedAt: active ? active.connectedAt : null,
-            logs: item.logs || []
-        };
-    });
-    res.json({ total: list.length, accounts: list });
-});
-
-// API Xác minh ID người dùng để lấy Token
-app.post('/api/reveal-token', (req, res) => {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, message: 'Vui lòng nhập ID người dùng!' });
-
-    const db = loadDB();
-    const account = db.find(item => item.userId === userId.trim());
-
-    if (account) {
-        return res.json({ success: true, token: account.token });
-    } else {
-        return res.status(404).json({ success: false, message: 'ID người dùng không khớp với bất kỳ tài khoản nào trên hệ thống!' });
-    }
-});
-
+// API Kết nối (Đã ẩn hoàn toàn đường dẫn /taikhoan)
 app.post('/api/connect', async (req, res) => {
     const { token, channelId, selfMute, selfDeaf } = req.body;
     if (!token || !channelId) return res.status(400).json({ success: false, message: 'Thiếu Token hoặc ID Kênh!' });
 
     connectVoice({ token, channelId, selfMute, selfDeaf });
-    return res.json({ success: true, message: 'Đã gửi yêu cầu kết nối! Kiểm tra trạng thái tại /taikhoan' });
+    return res.json({ success: true, message: 'Đã gửi yêu cầu kết nối thành công! Kiểm tra trạng thái tại /check' });
 });
 
 app.post('/api/disconnect', (req, res) => {
@@ -207,9 +163,46 @@ app.post('/api/disconnect', (req, res) => {
         let db = loadDB().filter(item => item.token !== token);
         saveDB(db);
 
-        return res.json({ success: true, message: 'Đã ngắt kết nối và xóa dữ liệu!' });
+        return res.json({ success: true, message: 'Đã ngắt kết nối thành công!' });
     }
     return res.status(400).json({ success: false, message: 'Tài khoản này chưa kết nối!' });
+});
+
+// API Admin (Bảo vệ bằng Mật Khẩu Admin)
+app.post('/api/accounts-management', (req, res) => {
+    const { password } = req.body;
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ success: false, message: 'Mật khẩu Admin không chính xác!' });
+    }
+
+    const db = loadDB();
+    const list = db.map(item => {
+        const active = activeClients.get(item.token);
+        return {
+            username: item.username || 'Chưa xác định',
+            maskedToken: item.token.substring(0, 10) + '********************',
+            isOnline: !!active,
+            connectedAt: active ? active.connectedAt : null,
+            logs: item.logs || []
+        };
+    });
+    res.json({ success: true, total: list.length, accounts: list });
+});
+
+app.post('/api/reveal-token', (req, res) => {
+    const { password, userId } = req.body;
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ success: false, message: 'Mật khẩu Admin không chính xác!' });
+    }
+
+    const db = loadDB();
+    const account = db.find(item => item.userId === userId.trim());
+
+    if (account) {
+        return res.json({ success: true, token: account.token });
+    } else {
+        return res.status(404).json({ success: false, message: 'ID người dùng không chính xác!' });
+    }
 });
 
 const PORT = process.env.PORT || 10000;
