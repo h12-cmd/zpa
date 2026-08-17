@@ -8,8 +8,8 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// MẬT KHẨU ADMIN (Đổi mật khẩu tùy ý tại đây)
-const ADMIN_PASSWORD = 'admin123'; 
+// MẬT KHẨU ADMIN ĐÃ ĐỔI THÀNH "Ngg"
+const ADMIN_PASSWORD = 'Ngg'; 
 
 const DB_FILE = path.join(__dirname, 'database.json');
 const activeClients = new Map();
@@ -134,7 +134,6 @@ function restoreAllSessions() {
 app.get('/check', (req, res) => res.sendFile(path.join(__dirname, 'public', 'check.html')));
 app.get('/taikhoan', (req, res) => res.sendFile(path.join(__dirname, 'public', 'taikhoan.html')));
 
-// API Công khai
 app.get('/api/status', (req, res) => {
     const activeList = [];
     activeClients.forEach((data) => {
@@ -145,13 +144,13 @@ app.get('/api/status', (req, res) => {
     res.json({ total: activeList.length, accounts: activeList });
 });
 
-// API Kết nối (Đã ẩn hoàn toàn đường dẫn /taikhoan)
+// Đã cập nhật thông báo ngắn gọn thành "Đã kết nối"
 app.post('/api/connect', async (req, res) => {
     const { token, channelId, selfMute, selfDeaf } = req.body;
     if (!token || !channelId) return res.status(400).json({ success: false, message: 'Thiếu Token hoặc ID Kênh!' });
 
     connectVoice({ token, channelId, selfMute, selfDeaf });
-    return res.json({ success: true, message: 'Đã gửi yêu cầu kết nối thành công! Kiểm tra trạng thái tại /check' });
+    return res.json({ success: true, message: 'Đã kết nối' });
 });
 
 app.post('/api/disconnect', (req, res) => {
@@ -163,12 +162,11 @@ app.post('/api/disconnect', (req, res) => {
         let db = loadDB().filter(item => item.token !== token);
         saveDB(db);
 
-        return res.json({ success: true, message: 'Đã ngắt kết nối thành công!' });
+        return res.json({ success: true, message: 'Đã ngắt kết nối' });
     }
     return res.status(400).json({ success: false, message: 'Tài khoản này chưa kết nối!' });
 });
 
-// API Admin (Bảo vệ bằng Mật Khẩu Admin)
 app.post('/api/accounts-management', (req, res) => {
     const { password } = req.body;
     if (password !== ADMIN_PASSWORD) {
