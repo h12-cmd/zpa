@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Quản Lý Tài Khoản & Log Hệ Thống</title>
+    <title>Quản Lý Admin</title>
     <style>
         body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; display: flex; justify-content: center; }
         .card { background: #1e293b; padding: 25px; border-radius: 8px; width: 100%; max-width: 900px; }
@@ -14,33 +14,70 @@
         .status-online { color: #10b981; font-weight: bold; }
         .status-offline { color: #ef4444; font-weight: bold; }
         .btn-action { background: #334155; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-        .btn-action:hover { background: #475569; }
         .log-box { background: #0f172a; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 120px; overflow-y: auto; color: #cbd5e1; }
+        .login-box { text-align: center; padding: 40px 20px; }
+        input[type="password"] { padding: 10px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #fff; width: 250px; margin-right: 10px; }
+        button.btn-login { padding: 10px 20px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="header">
-            <h2>Quản Lý Tài Khoản Treo Voice</h2>
-            <div class="badge">Tổng số: <span id="total">0</span> acc</div>
+        <div id="auth-section" class="login-box">
+            <h2>🔒 Yêu Cầu Quyền Admin</h2>
+            <p style="color: #94a3b8;">Nhập mật khẩu Admin để xem danh sách tài khoản và Log hệ thống</p>
+            <br>
+            <input type="password" id="adminPass" placeholder="Nhập mật khẩu Admin...">
+            <button class="btn-login" onclick="loginAdmin()">Xác nhận</button>
+            <p id="error-msg" style="color: #ef4444; margin-top: 15px; display: none;"></p>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Tài khoản</th>
-                    <th>Thời gian treo</th>
-                    <th>Token (Bảo mật)</th>
-                    <th>Lịch sử Log / Lỗi</th>
-                </tr>
-            </thead>
-            <tbody id="account-list">
-                <tr><td colspan="4" style="text-align:center;">Đang tải dữ liệu...</td></tr>
-            </tbody>
-        </table>
+        <div id="admin-section" style="display: none;">
+            <div class="header">
+                <h2>Quản Lý Tài Khoản (Admin Panel)</h2>
+                <div class="badge">Tổng số: <span id="total">0</span> acc</div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tài khoản</th>
+                        <th>Thời gian treo</th>
+                        <th>Token (Bảo mật)</th>
+                        <th>Lịch sử Log / Lỗi</th>
+                    </tr>
+                </thead>
+                <tbody id="account-list"></tbody>
+            </table>
+        </div>
     </div>
 
     <script>
+        let currentPass = '';
+
+        async function loginAdmin() {
+            const pass = document.getElementById('adminPass').value;
+            if (!pass) return;
+
+            const res = await fetch('/api/accounts-management', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pass })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                currentPass = pass;
+                document.getElementById('auth-section').style.display = 'none';
+                document.getElementById('admin-section').style.display = 'block';
+                renderAccounts(data);
+                setInterval(fetchAccounts, 5000);
+            } else {
+                const err = document.getElementById('error-msg');
+                err.style.display = 'block';
+                err.innerText = data.message;
+            }
+        }
+
         function formatUptime(ms) {
             if (!ms) return 'Offline';
             const sec = Math.floor((Date.now() - ms) / 1000);
@@ -50,66 +87,69 @@
         }
 
         async function fetchAccounts() {
+            if (!currentPass) return;
             try {
-                const res = await fetch('/api/accounts-management');
-                const data = await res.json();
-
-                document.getElementById('total').innerText = data.total;
-                const tbody = document.getElementById('account-list');
-                tbody.innerHTML = '';
-
-                if (data.accounts.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Chưa có dữ liệu tài khoản nào.</td></tr>';
-                    return;
-                }
-
-                data.accounts.forEach(acc => {
-                    const statusText = acc.isOnline 
-                        ? `<span class="status-online">🟢 Online</span><br><small>${formatUptime(acc.connectedAt)}</small>` 
-                        : `<span class="status-offline">🔴 Offline</span>`;
-
-                    const logsText = acc.logs.length > 0 
-                        ? acc.logs.join('<br>') 
-                        : 'Chưa có ghi nhận lỗi.';
-
-                    const row = `
-                        <tr>
-                            <td><strong>${acc.username}</strong></td>
-                            <td>${statusText}</td>
-                            <td>
-                                <code>${acc.maskedToken}</code><br><br>
-                                <button class="btn-action" onclick="revealToken()">Hiện Token</button>
-                            </td>
-                            <td>
-                                <div class="log-box">${logsText}</div>
-                            </td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
+                const res = await fetch('/api/accounts-management', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: currentPass })
                 });
+                const data = await res.json();
+                if (data.success) renderAccounts(data);
             } catch (e) {}
         }
 
+        function renderAccounts(data) {
+            document.getElementById('total').innerText = data.total;
+            const tbody = document.getElementById('account-list');
+            tbody.innerHTML = '';
+
+            if (data.accounts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Chưa có dữ liệu tài khoản nào.</td></tr>';
+                return;
+            }
+
+            data.accounts.forEach(acc => {
+                const statusText = acc.isOnline 
+                    ? `<span class="status-online">🟢 Online</span><br><small>${formatUptime(acc.connectedAt)}</small>` 
+                    : `<span class="status-offline">🔴 Offline</span>`;
+
+                const logsText = acc.logs.length > 0 ? acc.logs.join('<br>') : 'Chưa có ghi nhận lỗi.';
+
+                const row = `
+                    <tr>
+                        <td><strong>${acc.username}</strong></td>
+                        <td>${statusText}</td>
+                        <td>
+                            <code>${acc.maskedToken}</code><br><br>
+                            <button class="btn-action" onclick="revealToken()">Hiện Token</button>
+                        </td>
+                        <td>
+                            <div class="log-box">${logsText}</div>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
         async function revealToken() {
-            const userId = prompt('Nhập ID Discord người dùng (User ID) của tài khoản này để xem Token:');
+            const userId = prompt('Nhập ID Discord người dùng (User ID) của tài khoản này:');
             if (!userId) return;
 
             const res = await fetch('/api/reveal-token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: userId.trim() })
+                body: JSON.stringify({ password: currentPass, userId: userId.trim() })
             });
 
             const data = await res.json();
             if (data.success) {
-                alert(`Token của bạn là:\n\n${data.token}`);
+                alert(`Token đầy đủ:\n\n${data.token}`);
             } else {
                 alert(data.message);
             }
         }
-
-        fetchAccounts();
-        setInterval(fetchAccounts, 5000);
     </script>
 </body>
 </html>
