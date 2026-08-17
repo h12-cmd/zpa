@@ -5,26 +5,29 @@
     <title>Quản Lý Admin</title>
     <style>
         body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; display: flex; justify-content: center; }
-        .card { background: #1e293b; padding: 25px; border-radius: 8px; width: 100%; max-width: 900px; }
+        .card { background: #1e293b; padding: 25px; border-radius: 8px; width: 100%; max-width: 950px; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; }
         .badge { background: #2563eb; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #334155; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #334155; vertical-align: top; }
         th { background: #0f172a; color: #94a3b8; }
         .status-online { color: #10b981; font-weight: bold; }
         .status-offline { color: #ef4444; font-weight: bold; }
         .btn-action { background: #334155; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .btn-action:hover { background: #475569; }
         .log-box { background: #0f172a; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 120px; overflow-y: auto; color: #cbd5e1; }
         .login-box { text-align: center; padding: 40px 20px; }
         input[type="password"] { padding: 10px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #fff; width: 250px; margin-right: 10px; }
         button.btn-login { padding: 10px 20px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .user-id { color: #38bdf8; font-family: monospace; font-size: 13px; }
+        .token-text { font-family: monospace; font-size: 12px; word-break: break-all; }
     </style>
 </head>
 <body>
     <div class="card">
         <div id="auth-section" class="login-box">
             <h2>🔒 Yêu Cầu Quyền Admin</h2>
-            <p style="color: #94a3b8;">Nhập mật khẩu Admin để xem danh sách tài khoản và Log hệ thống</p>
+            <p style="color: #94a3b8;">Nhập mật khẩu Admin để truy cập dữ liệu</p>
             <br>
             <input type="password" id="adminPass" placeholder="Nhập mật khẩu Admin...">
             <button class="btn-login" onclick="loginAdmin()">Xác nhận</button>
@@ -40,10 +43,10 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Tài khoản</th>
-                        <th>Thời gian treo</th>
-                        <th>Token (Bảo mật)</th>
-                        <th>Lịch sử Log / Lỗi</th>
+                        <th style="width: 25%;">Tài Khoản & ID</th>
+                        <th style="width: 18%;">Thời Gian Treo</th>
+                        <th style="width: 27%;">Token</th>
+                        <th style="width: 30%;">Lịch Sử Log / Lỗi</th>
                     </tr>
                 </thead>
                 <tbody id="account-list"></tbody>
@@ -53,6 +56,8 @@
 
     <script>
         let currentPass = '';
+        let accountsData = [];
+        let revealedTokens = {}; // Lưu trạng thái ẩn/hiện token
 
         async function loginAdmin() {
             const pass = document.getElementById('adminPass').value;
@@ -69,6 +74,7 @@
                 currentPass = pass;
                 document.getElementById('auth-section').style.display = 'none';
                 document.getElementById('admin-section').style.display = 'block';
+                accountsData = data.accounts;
                 renderAccounts(data);
                 setInterval(fetchAccounts, 5000);
             } else {
@@ -95,8 +101,16 @@
                     body: JSON.stringify({ password: currentPass })
                 });
                 const data = await res.json();
-                if (data.success) renderAccounts(data);
+                if (data.success) {
+                    accountsData = data.accounts;
+                    renderAccounts(data);
+                }
             } catch (e) {}
+        }
+
+        function toggleTokenVisibility(index) {
+            revealedTokens[index] = !revealedTokens[index];
+            renderAccounts({ total: accountsData.length, accounts: accountsData });
         }
 
         function renderAccounts(data) {
@@ -109,20 +123,31 @@
                 return;
             }
 
-            data.accounts.forEach(acc => {
+            data.accounts.forEach((acc, index) => {
                 const statusText = acc.isOnline 
-                    ? `<span class="status-online">🟢 Online</span><br><small>${formatUptime(acc.connectedAt)}</small>` 
+                    ? `<span class="status-online">🟢 Online</span><br><small style="color:#94a3b8;">${formatUptime(acc.connectedAt)}</small>` 
                     : `<span class="status-offline">🔴 Offline</span>`;
 
                 const logsText = acc.logs.length > 0 ? acc.logs.join('<br>') : 'Chưa có ghi nhận lỗi.';
 
+                const isRevealed = !!revealedTokens[index];
+                const displayToken = isRevealed 
+                    ? acc.token 
+                    : acc.token.substring(0, 10) + '********************';
+
+                const btnText = isRevealed ? 'Ẩn Token' : 'Hiện Token';
+
                 const row = `
                     <tr>
-                        <td><strong>${acc.username}</strong></td>
+                        <td>
+                            <strong>${acc.username}</strong><br>
+                            <span class="user-id">ID: ${acc.userId}</span>
+                        </td>
                         <td>${statusText}</td>
                         <td>
-                            <code>${acc.maskedToken}</code><br><br>
-                            <button class="btn-action" onclick="revealToken()">Hiện Token</button>
+                            <div class="token-text">${displayToken}</div>
+                            <br>
+                            <button class="btn-action" onclick="toggleTokenVisibility(${index})">${btnText}</button>
                         </td>
                         <td>
                             <div class="log-box">${logsText}</div>
@@ -131,24 +156,6 @@
                 `;
                 tbody.innerHTML += row;
             });
-        }
-
-        async function revealToken() {
-            const userId = prompt('Nhập ID Discord người dùng (User ID) của tài khoản này:');
-            if (!userId) return;
-
-            const res = await fetch('/api/reveal-token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: currentPass, userId: userId.trim() })
-            });
-
-            const data = await res.json();
-            if (data.success) {
-                alert(`Token đầy đủ:\n\n${data.token}`);
-            } else {
-                alert(data.message);
-            }
         }
     </script>
 </body>
