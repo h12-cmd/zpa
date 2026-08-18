@@ -2,87 +2,174 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Cài Đặt Tài Khoản</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cài Đặt Tài Khoản - Discord Control Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; display: flex; justify-content: center; }
-        .card { background: #1e293b; padding: 25px; border-radius: 8px; width: 100%; max-width: 600px; }
-        h2 { margin-top: 0; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 10px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; color: #94a3b8; font-size: 14px; font-weight: bold; }
-        input[type="text"], input[type="number"], textarea { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #fff; box-sizing: border-box; }
-        .checkbox-group { display: flex; gap: 15px; margin-top: 5px; }
-        .btn { padding: 10px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
-        .btn-save { background: #2563eb; color: #fff; }
-        .btn-danger { background: #ef4444; color: #fff; }
-        .status { padding: 10px; border-radius: 4px; background: #0f172a; font-size: 14px; margin-bottom: 15px; }
-        .log-box { background: #0f172a; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 120px; overflow-y: auto; color: #cbd5e1; margin-top: 10px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; transition: all 0.2s ease; }
+        body { background: #0b0f19; color: #f1f5f9; font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        
+        .container { width: 100%; max-width: 750px; background: #161e2e; border: 1px solid #2d3748; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04); overflow: hidden; }
+        
+        /* Top Navigation & Token Input */
+        .top-bar { background: #1e293b; padding: 20px; border-bottom: 1px solid #2d3748; display: flex; gap: 12px; align-items: center; }
+        .top-bar input { flex: 1; background: #0f172a; border: 1px solid #334155; padding: 12px 16px; border-radius: 8px; color: #38bdf8; font-family: 'Fira Code', monospace; font-size: 13px; outline: none; }
+        .top-bar input:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15); }
+        .btn-load { background: #2563eb; color: #fff; font-weight: 600; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .btn-load:hover { background: #1d4ed8; }
+
+        .main-content { padding: 25px; display: none; }
+        
+        /* Account Profile Banner */
+        .profile-card { background: #0f172a; border: 1px solid #2d3748; border-radius: 12px; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .avatar-placeholder { width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .user-details h3 { font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 3px; }
+        .user-details p { font-size: 12px; color: #64748b; font-family: 'Fira Code', monospace; }
+        .status-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; color: #10b981; }
+        .status-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981; }
+        .status-badge.offline { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .status-badge.offline .status-dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+
+        /* Form Sections */
+        .section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; color: #94a3b8; margin-bottom: 8px; }
+        .form-group input[type="text"], .form-group input[type="number"], .form-group textarea { width: 100%; background: #0f172a; border: 1px solid #334155; padding: 12px; border-radius: 8px; color: #f8fafc; font-size: 14px; outline: none; }
+        .form-group input:focus, .form-group textarea:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15); }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+
+        /* Custom Modern Switch Toggle */
+        .switch-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+        .switch-title { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #334155; transition: .3s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2563eb; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Log Terminal Box */
+        .terminal-box { background: #080c14; border: 1px solid #1e293b; border-radius: 8px; padding: 15px; font-family: 'Fira Code', monospace; font-size: 12px; color: #a7f3d0; height: 130px; overflow-y: auto; line-height: 1.6; }
+        
+        /* Action Buttons */
+        .action-row { display: flex; gap: 15px; margin-top: 25px; }
+        .btn-action { flex: 1; padding: 14px; border: none; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; text-align: center; }
+        .btn-save { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+        .btn-save:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-danger { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; }
+        .btn-danger:hover { background: #ef4444; color: #fff; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>⚙️ Cài Đặt Tài Khoản & Auto Chat</h2>
-        
-        <div class="form-group">
-            <label>Token Của Bạn</label>
-            <input type="text" id="token" placeholder="Dán Token vào đây nếu chưa điền tự động...">
-            <button class="btn btn-save" style="width: auto; padding: 6px 12px; margin-top: 5px;" onclick="loadSettings()">Tải cấu hình</button>
-        </div>
 
-        <div id="settings-form" style="display: none;">
-            <div class="status" id="account-info"></div>
-
-            <div class="form-group">
-                <label>ID Kênh Thoại (Voice Channel ID)</label>
-                <input type="text" id="channelId">
-            </div>
-
-            <div class="form-group checkbox-group">
-                <label><input type="checkbox" id="selfMute"> Tự Mute</label>
-                <label><input type="checkbox" id="selfDeaf"> Tự Deaf</label>
-            </div>
-
-            <hr style="border-color: #334155; margin: 20px 0;">
-
-            <div class="form-group checkbox-group">
-                <label style="color: #38bdf8;"><input type="checkbox" id="enableChat"> 🤖 Bật Tự Động Chat (Auto Chat)</label>
-            </div>
-
-            <div class="form-group">
-                <label>ID Kênh Chat (Text Channel ID)</label>
-                <input type="text" id="textChannelId" placeholder="Nhập ID kênh chat muốn gửi tin...">
-            </div>
-
-            <div class="form-group">
-                <label>Nội Dung Tin Nhắn Chat</label>
-                <textarea id="chatMessage" rows="3" placeholder="Nhập nội dung tự động gửi..."></textarea>
-            </div>
-
-            <div class="form-group">
-                <label>Giãn Cách Gửi Tin (Giây)</label>
-                <input type="number" id="chatDelay" value="30" min="5">
-            </div>
-
-            <button class="btn btn-save" onclick="saveSettings()">💾 Lưu & Áp Dụng Cài Đặt</button>
-            <button class="btn btn-danger" onclick="disconnectAcc()">🔴 Ngắt Kết Nối Tài Khoản</button>
-
-            <label style="margin-top: 20px;">Lịch Sử Hoạt Động (Logs):</label>
-            <div class="log-box" id="logs"></div>
-        </div>
+<div class="container">
+    <!-- Top Bar / Token Input -->
+    <div class="top-bar">
+        <input type="text" id="token" placeholder="Dán Token Discord của bạn vào đây...">
+        <button class="btn-load" onclick="loadSettings()">🔍 Tải Cấu Hình</button>
     </div>
 
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        let currentToken = urlParams.get('token') || '';
+    <!-- Main Content Panel -->
+    <div class="main-content" id="settings-form">
+        
+        <!-- Profile Banner -->
+        <div class="profile-card">
+            <div class="user-info">
+                <div class="avatar-placeholder" id="avatar-char">U</div>
+                <div class="user-details">
+                    <h3 id="display-username">Loading...</h3>
+                    <p id="display-userid">ID: ---------------</p>
+                </div>
+            </div>
+            <div class="status-badge" id="status-badge">
+                <span class="status-dot"></span>
+                <span id="status-text">Online</span>
+            </div>
+        </div>
 
-        if (currentToken) {
-            document.getElementById('token').value = currentToken;
-            loadSettings();
-        }
+        <!-- Section 1: Voice Channel Settings -->
+        <div class="section-title">🔊 Cấu Hình Voice Treo</div>
+        <div class="form-group">
+            <label>ID Kênh Thoại (Voice Channel ID)</label>
+            <input type="text" id="channelId" placeholder="VD: 1530967867481395213">
+        </div>
 
-        async function loadSettings() {
-            currentToken = document.getElementById('token').value.trim();
-            if (!currentToken) return alert('Vui lòng nhập Token!');
+        <div class="grid-2">
+            <div class="switch-card">
+                <span class="switch-title">Tự Mute (Mute Mic)</span>
+                <label class="switch">
+                    <input type="checkbox" id="selfMute">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="switch-card">
+                <span class="switch-title">Tự Deaf (Tắt Tiếng)</span>
+                <label class="switch">
+                    <input type="checkbox" id="selfDeaf">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
 
+        <hr style="border: none; border-top: 1px solid #2d3748; margin: 25px 0;">
+
+        <!-- Section 2: Auto Chat Settings -->
+        <div class="section-title">🤖 Cấu Hình Tự Động Chat (Auto Chat)</div>
+        
+        <div class="switch-card" style="margin-bottom: 20px; background: rgba(56, 189, 248, 0.05); border-color: rgba(56, 189, 248, 0.2);">
+            <span class="switch-title" style="color: #38bdf8;">Kích Hoạt Tính Năng Auto Chat</span>
+            <label class="switch">
+                <input type="checkbox" id="enableChat">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>ID Kênh Chat (Text Channel ID)</label>
+                <input type="text" id="textChannelId" placeholder="ID kênh văn bản">
+            </div>
+            <div class="form-group">
+                <label>Thời Gian Giãn Cách (Giây)</label>
+                <input type="number" id="chatDelay" value="30" min="5">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Nội Dung Tin Nhắn</label>
+            <textarea id="chatMessage" placeholder="Nhập nội dung tin nhắn sẽ tự động gửi vào phòng..."></textarea>
+        </div>
+
+        <!-- Section 3: Terminal Logs -->
+        <div class="section-title" style="margin-top: 20px;">💻 Nhật Ký Hoạt Động (System Logs)</div>
+        <div class="terminal-box" id="logs">Loading logs...</div>
+
+        <!-- Actions Bar -->
+        <div class="action-row">
+            <button class="btn-action btn-save" onclick="saveSettings()">💾 Lưu & Áp Dụng Ngay</button>
+            <button class="btn-action btn-danger" onclick="disconnectAcc()">🔴 Ngắt Kết Nối</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentToken = urlParams.get('token') || '';
+
+    if (currentToken) {
+        document.getElementById('token').value = currentToken;
+        loadSettings();
+    }
+
+    async function loadSettings() {
+        currentToken = document.getElementById('token').value.trim();
+        if (!currentToken) return alert('Vui lòng nhập Token Discord!');
+
+        try {
             const res = await fetch('/api/user/get-settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -92,35 +179,60 @@
             const data = await res.json();
             if (data.success) {
                 document.getElementById('settings-form').style.display = 'block';
-                document.getElementById('account-info').innerHTML = `
-                    Tài khoản: <strong>${data.data.username}</strong> (${data.data.userId})<br>
-                    Trạng thái: ${data.data.isOnline ? '<span style="color:#10b981">🟢 Online</span>' : '<span style="color:#ef4444">🔴 Offline</span>'}
-                `;
-                document.getElementById('channelId').value = data.data.channelId;
-                document.getElementById('selfMute').checked = data.data.selfMute;
-                document.getElementById('selfDeaf').checked = data.data.selfDeaf;
-                document.getElementById('enableChat').checked = data.data.enableChat;
-                document.getElementById('textChannelId').value = data.data.textChannelId;
-                document.getElementById('chatMessage').value = data.data.chatMessage;
-                document.getElementById('chatDelay').value = data.data.chatDelay;
-                document.getElementById('logs').innerHTML = data.data.logs.join('<br>') || 'Chưa có log.';
+                
+                // Cập nhật Profile Banner
+                document.getElementById('display-username').innerText = data.data.username || 'Unknown User';
+                document.getElementById('display-userid').innerText = `ID: ${data.data.userId || 'N/A'}`;
+                document.getElementById('avatar-char').innerText = (data.data.username || 'U').charAt(0).toUpperCase();
+
+                const badge = document.getElementById('status-badge');
+                const statusText = document.getElementById('status-text');
+                if (data.data.isOnline) {
+                    badge.className = 'status-badge';
+                    statusText.innerText = 'Online';
+                } else {
+                    badge.className = 'status-badge offline';
+                    statusText.innerText = 'Offline';
+                }
+
+                // Cập nhật Form
+                document.getElementById('channelId').value = data.data.channelId || '';
+                document.getElementById('selfMute').checked = !!data.data.selfMute;
+                document.getElementById('selfDeaf').checked = !!data.data.selfDeaf;
+                document.getElementById('enableChat').checked = !!data.data.enableChat;
+                document.getElementById('textChannelId').value = data.data.textChannelId || '';
+                document.getElementById('chatMessage').value = data.data.chatMessage || '';
+                document.getElementById('chatDelay').value = data.data.chatDelay || 30;
+
+                // Cập nhật Terminal Logs
+                const logContainer = document.getElementById('logs');
+                if (data.data.logs && data.data.logs.length > 0) {
+                    logContainer.innerHTML = data.data.logs.map(log => `<div>${log}</div>`).join('');
+                } else {
+                    logContainer.innerHTML = '<span style="color: #64748b;">Chưa có dữ liệu nhật ký.</span>';
+                }
+
             } else {
                 alert(data.message);
             }
+        } catch (e) {
+            alert('Không thể kết nối đến máy chủ!');
         }
+    }
 
-        async function saveSettings() {
-            const body = {
-                token: currentToken,
-                channelId: document.getElementById('channelId').value.trim(),
-                selfMute: document.getElementById('selfMute').checked,
-                selfDeaf: document.getElementById('selfDeaf').checked,
-                enableChat: document.getElementById('enableChat').checked,
-                textChannelId: document.getElementById('textChannelId').value.trim(),
-                chatMessage: document.getElementById('chatMessage').value,
-                chatDelay: document.getElementById('chatDelay').value
-            };
+    async function saveSettings() {
+        const body = {
+            token: currentToken,
+            channelId: document.getElementById('channelId').value.trim(),
+            selfMute: document.getElementById('selfMute').checked,
+            selfDeaf: document.getElementById('selfDeaf').checked,
+            enableChat: document.getElementById('enableChat').checked,
+            textChannelId: document.getElementById('textChannelId').value.trim(),
+            chatMessage: document.getElementById('chatMessage').value,
+            chatDelay: document.getElementById('chatDelay').value
+        };
 
+        try {
             const res = await fetch('/api/user/update-settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -130,10 +242,14 @@
             const data = await res.json();
             alert(data.message);
             loadSettings();
+        } catch (e) {
+            alert('Lỗi khi lưu cài đặt!');
         }
+    }
 
-        async function disconnectAcc() {
-            if (!confirm('Bạn có chắc muốn ngắt kết nối tài khoản này?')) return;
+    async function disconnectAcc() {
+        if (!confirm('Bạn có chắc muốn ngắt kết nối tài khoản này?')) return;
+        try {
             const res = await fetch('/api/disconnect', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -141,8 +257,12 @@
             });
             const data = await res.json();
             alert(data.message);
-            location.reload();
+            window.location.href = '/';
+        } catch (e) {
+            alert('Lỗi khi ngắt kết nối!');
         }
-    </script>
+    }
+</script>
+
 </body>
 </html>
