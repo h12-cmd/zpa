@@ -8,9 +8,7 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// MẬT KHẨU ADMIN
 const ADMIN_PASSWORD = 'Ngg'; 
-
 const DB_FILE = path.join(__dirname, 'database.json');
 const activeClients = new Map();
 
@@ -32,7 +30,7 @@ function addLog(token, message) {
     if (index !== -1) {
         if (!db[index].logs) db[index].logs = [];
         db[index].logs.unshift(logEntry);
-        if (db[index].logs.length > 20) db[index].logs.pop();
+        if (db[index].logs.length > 10) db[index].logs.pop(); // Giới hạn 10 log để tiết kiệm RAM
         saveDB(db);
     }
 }
@@ -40,12 +38,23 @@ function addLog(token, message) {
 async function connectVoice(config) {
     const { token, channelId, selfMute, selfDeaf } = config;
 
+    // Giải phóng bộ nhớ client cũ nếu có
     if (activeClients.has(token)) {
-        try { activeClients.get(token).client.destroy(); } catch (e) {}
+        try { 
+            const oldData = activeClients.get(token);
+            oldData.client.removeAllListeners();
+            oldData.client.destroy(); 
+        } catch (e) {}
         activeClients.delete(token);
     }
 
-    const client = new Client();
+    // Tắt kiểm tra cập nhật và tối ưu cache cho Client
+    const client = new Client({
+        checkUpdate: false,
+        sweepers: {
+            messages: { interval: 120, lifetime: 60 }
+        }
+    });
 
     client.on('ready', async () => {
         try {
@@ -85,7 +94,7 @@ async function connectVoice(config) {
                     ]);
                 } catch (e) {
                     try { connection.destroy(); } catch (err) {}
-                    addLog(token, 'Lỗi: Thử lại thất bại. Đang tạo lại phiên sau 5s...');
+                    addLog(token, 'Lỗi: Thử lại thất bại. Đang kết nối lại sau 5s...');
                     setTimeout(() => connectVoice(config), 5000);
                 }
             });
@@ -155,7 +164,11 @@ app.post('/api/connect', async (req, res) => {
 app.post('/api/disconnect', (req, res) => {
     const { token } = req.body;
     if (activeClients.has(token)) {
-        try { activeClients.get(token).client.destroy(); } catch (e) {}
+        try { 
+            const data = activeClients.get(token);
+            data.client.removeAllListeners();
+            data.client.destroy(); 
+        } catch (e) {}
         activeClients.delete(token);
 
         let db = loadDB().filter(item => item.token !== token);
@@ -166,7 +179,6 @@ app.post('/api/disconnect', (req, res) => {
     return res.status(400).json({ success: false, message: 'Tài khoản này chưa kết nối!' });
 });
 
-// API Admin trả về đầy đủ Token & User ID cho Admin
 app.post('/api/accounts-management', (req, res) => {
     const { password } = req.body;
     if (password !== ADMIN_PASSWORD) {
