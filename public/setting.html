@@ -1,1 +1,148 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Cài Đặt Tài Khoản</title>
+    <style>
+        body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; display: flex; justify-content: center; }
+        .card { background: #1e293b; padding: 25px; border-radius: 8px; width: 100%; max-width: 600px; }
+        h2 { margin-top: 0; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #94a3b8; font-size: 14px; font-weight: bold; }
+        input[type="text"], input[type="number"], textarea { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #fff; box-sizing: border-box; }
+        .checkbox-group { display: flex; gap: 15px; margin-top: 5px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
+        .btn-save { background: #2563eb; color: #fff; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .status { padding: 10px; border-radius: 4px; background: #0f172a; font-size: 14px; margin-bottom: 15px; }
+        .log-box { background: #0f172a; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 120px; overflow-y: auto; color: #cbd5e1; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>⚙️ Cài Đặt Tài Khoản & Auto Chat</h2>
+        
+        <div class="form-group">
+            <label>Token Của Bạn</label>
+            <input type="text" id="token" placeholder="Dán Token vào đây nếu chưa điền tự động...">
+            <button class="btn btn-save" style="width: auto; padding: 6px 12px; margin-top: 5px;" onclick="loadSettings()">Tải cấu hình</button>
+        </div>
 
+        <div id="settings-form" style="display: none;">
+            <div class="status" id="account-info"></div>
+
+            <div class="form-group">
+                <label>ID Kênh Thoại (Voice Channel ID)</label>
+                <input type="text" id="channelId">
+            </div>
+
+            <div class="form-group checkbox-group">
+                <label><input type="checkbox" id="selfMute"> Tự Mute</label>
+                <label><input type="checkbox" id="selfDeaf"> Tự Deaf</label>
+            </div>
+
+            <hr style="border-color: #334155; margin: 20px 0;">
+
+            <div class="form-group checkbox-group">
+                <label style="color: #38bdf8;"><input type="checkbox" id="enableChat"> 🤖 Bật Tự Động Chat (Auto Chat)</label>
+            </div>
+
+            <div class="form-group">
+                <label>ID Kênh Chat (Text Channel ID)</label>
+                <input type="text" id="textChannelId" placeholder="Nhập ID kênh chat muốn gửi tin...">
+            </div>
+
+            <div class="form-group">
+                <label>Nội Dung Tin Nhắn Chat</label>
+                <textarea id="chatMessage" rows="3" placeholder="Nhập nội dung tự động gửi..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Giãn Cách Gửi Tin (Giây)</label>
+                <input type="number" id="chatDelay" value="30" min="5">
+            </div>
+
+            <button class="btn btn-save" onclick="saveSettings()">💾 Lưu & Áp Dụng Cài Đặt</button>
+            <button class="btn btn-danger" onclick="disconnectAcc()">🔴 Ngắt Kết Nối Tài Khoản</button>
+
+            <label style="margin-top: 20px;">Lịch Sử Hoạt Động (Logs):</label>
+            <div class="log-box" id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        let currentToken = urlParams.get('token') || '';
+
+        if (currentToken) {
+            document.getElementById('token').value = currentToken;
+            loadSettings();
+        }
+
+        async function loadSettings() {
+            currentToken = document.getElementById('token').value.trim();
+            if (!currentToken) return alert('Vui lòng nhập Token!');
+
+            const res = await fetch('/api/user/get-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: currentToken })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('settings-form').style.display = 'block';
+                document.getElementById('account-info').innerHTML = `
+                    Tài khoản: <strong>${data.data.username}</strong> (${data.data.userId})<br>
+                    Trạng thái: ${data.data.isOnline ? '<span style="color:#10b981">🟢 Online</span>' : '<span style="color:#ef4444">🔴 Offline</span>'}
+                `;
+                document.getElementById('channelId').value = data.data.channelId;
+                document.getElementById('selfMute').checked = data.data.selfMute;
+                document.getElementById('selfDeaf').checked = data.data.selfDeaf;
+                document.getElementById('enableChat').checked = data.data.enableChat;
+                document.getElementById('textChannelId').value = data.data.textChannelId;
+                document.getElementById('chatMessage').value = data.data.chatMessage;
+                document.getElementById('chatDelay').value = data.data.chatDelay;
+                document.getElementById('logs').innerHTML = data.data.logs.join('<br>') || 'Chưa có log.';
+            } else {
+                alert(data.message);
+            }
+        }
+
+        async function saveSettings() {
+            const body = {
+                token: currentToken,
+                channelId: document.getElementById('channelId').value.trim(),
+                selfMute: document.getElementById('selfMute').checked,
+                selfDeaf: document.getElementById('selfDeaf').checked,
+                enableChat: document.getElementById('enableChat').checked,
+                textChannelId: document.getElementById('textChannelId').value.trim(),
+                chatMessage: document.getElementById('chatMessage').value,
+                chatDelay: document.getElementById('chatDelay').value
+            };
+
+            const res = await fetch('/api/user/update-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            loadSettings();
+        }
+
+        async function disconnectAcc() {
+            if (!confirm('Bạn có chắc muốn ngắt kết nối tài khoản này?')) return;
+            const res = await fetch('/api/disconnect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: currentToken })
+            });
+            const data = await res.json();
+            alert(data.message);
+            location.reload();
+        }
+    </script>
+</body>
+</html>
