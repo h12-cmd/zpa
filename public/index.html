@@ -16,7 +16,7 @@
         .btn-connect:hover { background: #1d4ed8; }
         .btn-disconnect { background: #dc2626; }
         .btn-disconnect:hover { background: #b91c1c; }
-        #status { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; }
+        #status { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -49,27 +49,41 @@
             const token = document.getElementById('token').value.trim();
             const channelId = document.getElementById('channelId').value.trim();
 
-            if(!token) return alert('Vui lòng nhập Token!');
+            if (!token) return alert('Vui lòng nhập Token!');
+            if (type === 'connect' && !channelId) return alert('Vui lòng nhập ID Kênh Thoại!');
 
             statusDiv.style.display = 'block';
             statusDiv.style.background = '#334155';
             statusDiv.innerText = 'Đang xử lý yêu cầu...';
 
             const endpoint = type === 'connect' ? '/api/connect' : '/api/disconnect';
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    token,
-                    channelId,
-                    selfMute: document.getElementById('selfMute').checked,
-                    selfDeaf: document.getElementById('selfDeaf').checked
-                })
-            });
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token,
+                        channelId,
+                        selfMute: document.getElementById('selfMute').checked,
+                        selfDeaf: document.getElementById('selfDeaf').checked
+                    })
+                });
 
-            const data = await res.json();
-            statusDiv.style.background = data.success ? '#064e3b' : '#7f1d1d';
-            statusDiv.innerText = data.message;
+                const data = await res.json();
+                statusDiv.style.background = data.success ? '#064e3b' : '#7f1d1d';
+
+                if (data.success && type === 'connect') {
+                    statusDiv.innerText = `${data.message}! Đang chuyển hướng sang trang Cài Đặt & Auto Chat...`;
+                    setTimeout(() => {
+                        window.location.href = data.settingUrl || `/setting?token=${encodeURIComponent(token)}`;
+                    }, 1000);
+                } else {
+                    statusDiv.innerText = data.message;
+                }
+            } catch (err) {
+                statusDiv.style.background = '#7f1d1d';
+                statusDiv.innerText = 'Có lỗi xảy ra khi kết nối máy chủ!';
+            }
         }
     </script>
 </body>
