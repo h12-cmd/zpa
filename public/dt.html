@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trạng Thái Treo Voice</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            background: #0f172a; 
+            color: #fff; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            padding: 12px; 
+            margin: 0;
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .card { 
+            background: #1e293b; 
+            padding: 20px; 
+            border-radius: 12px; 
+            width: 100%; 
+            max-width: 600px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            margin-top: 10px;
+        }
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 1px solid #334155; 
+            padding-bottom: 15px; 
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        h2 { margin: 0; font-size: 1.2rem; }
+        .badge { 
+            background: #059669; 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-weight: bold; 
+            font-size: 13px; 
+        }
+        
+        .table-container {
+            width: 100%;
+            margin-top: 15px;
+            overflow-x: auto;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #334155; font-size: 14px; }
+        th { background: #0f172a; color: #94a3b8; }
+        .status-dot { height: 8px; width: 8px; background-color: #10b981; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+        /* Tối ưu giao diện dạng Card trên điện thoại nhỏ */
+        @media (max-width: 480px) {
+            table, thead, tbody, th, td, tr { display: block; }
+            thead { display: none; }
+            tr { 
+                background: #0f172a; 
+                margin-bottom: 10px; 
+                border-radius: 8px; 
+                padding: 10px 14px;
+                border: 1px solid #334155;
+            }
+            td { 
+                padding: 6px 0; 
+                border: none; 
+                display: flex;
+                justify-content: space-between;
+            }
+            td::before {
+                content: attr(data-label);
+                color: #94a3b8;
+                font-weight: bold;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <h2>Hệ Thống Treo Voice</h2>
+            <div class="badge">Đang treo: <span id="total">0</span> acc</div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tài khoản (Ẩn danh)</th>
+                        <th>Trạng thái</th>
+                        <th>Thời gian treo</th>
+                    </tr>
+                </thead>
+                <tbody id="list">
+                    <tr><td colspan="3" style="text-align:center;">Đang tải dữ liệu...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function formatUptime(ms) {
+            const sec = Math.floor((Date.now() - ms) / 1000);
+            const hrs = Math.floor(sec / 3600);
+            const mins = Math.floor((sec % 3600) / 60);
+            return `${hrs}h ${mins}m`;
+        }
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                document.getElementById('total').innerText = data.total;
+                const tbody = document.getElementById('list');
+                tbody.innerHTML = '';
+
+                if (!data.accounts || data.accounts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8; padding: 20px 0;">Hiện chưa có tài khoản nào treo.</td></tr>';
+                    return;
+                }
+
+                data.accounts.forEach(acc => {
+                    const row = `
+                        <tr>
+                            <td data-label="Tài khoản"><strong>${acc.name}</strong></td>
+                            <td data-label="Trạng thái"><span class="status-dot"></span> Online</td>
+                            <td data-label="Thời gian treo">${formatUptime(acc.connectedAt)}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            } catch (e) {}
+        }
+
+        fetchStatus();
+        setInterval(fetchStatus, 5000);
+    </script>
+</body>
+</html>
