@@ -2,19 +2,22 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trạng Thái Treo Voice</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Treo Voice Discord (Mobile)</title>
     <style>
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
         body { 
             background: #0f172a; 
             color: #fff; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             padding: 12px; 
             margin: 0;
             display: flex; 
             justify-content: center; 
-            align-items: flex-start;
+            align-items: center;
             min-height: 100vh;
         }
         .card { 
@@ -22,123 +25,165 @@
             padding: 20px; 
             border-radius: 12px; 
             width: 100%; 
-            max-width: 600px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            margin-top: 10px;
+            max-width: 480px; 
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            border: 1px solid #334155;
         }
-        .header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border-bottom: 1px solid #334155; 
-            padding-bottom: 15px; 
-            flex-wrap: wrap;
-            gap: 10px;
+        h2 {
+            margin: 0 0 15px 0;
+            font-size: 1.3rem;
+            text-align: center;
+            color: #f8fafc;
         }
-        h2 { margin: 0; font-size: 1.2rem; }
-        .badge { 
-            background: #059669; 
-            padding: 6px 12px; 
-            border-radius: 20px; 
-            font-weight: bold; 
+        .alert { 
+            background: #450a0a; 
+            color: #fca5a5; 
+            padding: 10px 12px; 
+            border-radius: 8px; 
+            margin-bottom: 15px; 
             font-size: 13px; 
+            line-height: 1.4;
+            border: 1px solid #7f1d1d;
         }
-        
-        .table-container {
-            width: 100%;
-            margin-top: 15px;
-            overflow-x: auto;
+        label { 
+            display: block; 
+            margin-top: 12px; 
+            font-weight: 600; 
+            font-size: 13px;
+            color: #cbd5e1;
         }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #334155; font-size: 14px; }
-        th { background: #0f172a; color: #94a3b8; }
-        .status-dot { height: 8px; width: 8px; background-color: #10b981; border-radius: 50%; display: inline-block; margin-right: 6px; }
-
-        /* Tối ưu giao diện dạng Card trên điện thoại nhỏ */
-        @media (max-width: 480px) {
-            table, thead, tbody, th, td, tr { display: block; }
-            thead { display: none; }
-            tr { 
-                background: #0f172a; 
-                margin-bottom: 10px; 
-                border-radius: 8px; 
-                padding: 10px 14px;
-                border: 1px solid #334155;
-            }
-            td { 
-                padding: 6px 0; 
-                border: none; 
-                display: flex;
-                justify-content: space-between;
-            }
-            td::before {
-                content: attr(data-label);
-                color: #94a3b8;
-                font-weight: bold;
-            }
+        input[type="text"] { 
+            width: 100%; 
+            padding: 12px; 
+            margin-top: 6px; 
+            background: #0f172a; 
+            border: 1px solid #334155; 
+            color: #fff; 
+            border-radius: 8px; 
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: #3b82f6;
+        }
+        .switches { 
+            display: flex; 
+            gap: 20px; 
+            margin: 18px 0; 
+        }
+        .switches label {
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #fff;
+        }
+        .switches input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #2563eb;
+        }
+        .btn-group { 
+            display: flex; 
+            flex-direction: column;
+            gap: 10px; 
+        }
+        button { 
+            width: 100%; 
+            padding: 14px; 
+            color: #fff; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 15px;
+            transition: opacity 0.2s;
+        }
+        button:active {
+            opacity: 0.85;
+        }
+        .btn-connect { background: #2563eb; }
+        .btn-disconnect { background: #dc2626; }
+        #status { 
+            margin-top: 15px; 
+            padding: 12px; 
+            border-radius: 8px; 
+            display: none; 
+            line-height: 1.4; 
+            font-size: 13px;
+            word-break: break-word;
         }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="header">
-            <h2>Hệ Thống Treo Voice</h2>
-            <div class="badge">Đang treo: <span id="total">0</span> acc</div>
+        <h2>Treo Voice Discord (Mobile)</h2>
+        <div class="alert">⚠️ BẮT BƯỘC: Bật Tự Mute và Tự Deaf để bảo vệ tài khoản khỏi Discord quét!</div>
+        
+        <label>Token Tài Khoản Discord</label>
+        <input type="text" id="token" placeholder="Nhập User Token của bạn...">
+
+        <label>ID Kênh Thoại (Voice Channel ID)</label>
+        <input type="text" id="channelId" placeholder="VD: 1530967867481395213">
+
+        <div class="switches">
+            <label><input type="checkbox" id="selfMute" checked> Tự Mute</label>
+            <label><input type="checkbox" id="selfDeaf" checked> Tự Deaf</label>
         </div>
 
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Tài khoản (Ẩn danh)</th>
-                        <th>Trạng thái</th>
-                        <th>Thời gian treo</th>
-                    </tr>
-                </thead>
-                <tbody id="list">
-                    <tr><td colspan="3" style="text-align:center;">Đang tải dữ liệu...</td></tr>
-                </tbody>
-            </table>
+        <div class="btn-group">
+            <button class="btn-connect" onclick="action('connect')">Bắt đầu Treo Voice</button>
+            <button class="btn-disconnect" onclick="action('disconnect')">Ngắt kết nối</button>
         </div>
+
+        <div id="status"></div>
     </div>
 
     <script>
-        function formatUptime(ms) {
-            const sec = Math.floor((Date.now() - ms) / 1000);
-            const hrs = Math.floor(sec / 3600);
-            const mins = Math.floor((sec % 3600) / 60);
-            return `${hrs}h ${mins}m`;
-        }
+        async function action(type) {
+            const statusDiv = document.getElementById('status');
+            const token = document.getElementById('token').value.trim();
+            const channelId = document.getElementById('channelId').value.trim();
 
-        async function fetchStatus() {
+            if (!token) return alert('Vui lòng nhập Token!');
+            if (type === 'connect' && !channelId) return alert('Vui lòng nhập ID Kênh Thoại!');
+
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#334155';
+            statusDiv.innerText = 'Đang xử lý yêu cầu...';
+
+            const endpoint = type === 'connect' ? '/api/connect' : '/api/disconnect';
             try {
-                const res = await fetch('/api/status');
-                const data = await res.json();
-                
-                document.getElementById('total').innerText = data.total;
-                const tbody = document.getElementById('list');
-                tbody.innerHTML = '';
-
-                if (!data.accounts || data.accounts.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8; padding: 20px 0;">Hiện chưa có tài khoản nào treo.</td></tr>';
-                    return;
-                }
-
-                data.accounts.forEach(acc => {
-                    const row = `
-                        <tr>
-                            <td data-label="Tài khoản"><strong>${acc.name}</strong></td>
-                            <td data-label="Trạng thái"><span class="status-dot"></span> Online</td>
-                            <td data-label="Thời gian treo">${formatUptime(acc.connectedAt)}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token,
+                        channelId,
+                        selfMute: document.getElementById('selfMute').checked,
+                        selfDeaf: document.getElementById('selfDeaf').checked
+                    })
                 });
-            } catch (e) {}
-        }
 
-        fetchStatus();
-        setInterval(fetchStatus, 5000);
+                const data = await res.json();
+                statusDiv.style.background = data.success ? '#064e3b' : '#7f1d1d';
+
+                if (data.success && type === 'connect') {
+                    statusDiv.innerText = `${data.message}! Đang chuyển hướng sang trang Cài Đặt...`;
+                    setTimeout(() => {
+                        window.location.href = data.settingUrl || `/setting?token=${encodeURIComponent(token)}`;
+                    }, 1000);
+                } else {
+                    statusDiv.innerText = data.message;
+                }
+            } catch (err) {
+                statusDiv.style.background = '#7f1d1d';
+                statusDiv.innerText = 'Có lỗi xảy ra khi kết nối máy chủ!';
+            }
+        }
     </script>
 </body>
 </html>
