@@ -82,7 +82,7 @@ async function connectVoice(config) {
                         guild_id: channel.guild.id,
                         channel_id: channel.id,
                         self_mute: Boolean(selfMute),
-                        selfDeaf: Boolean(selfDeaf)
+                        self_deaf: Boolean(selfDeaf)
                     }
                 });
             }
@@ -149,10 +149,43 @@ function restoreAllSessions() {
     db.forEach(config => connectVoice(config));
 }
 
-// Routes Giao Diện
+// ==========================================
+// ROUTES GIAO DIỆN (CHUYỂN TRANG)
+// ==========================================
 app.get('/check', (req, res) => res.sendFile(path.join(__dirname, 'public', 'check.html')));
 app.get('/taikhoan', (req, res) => res.sendFile(path.join(__dirname, 'public', 'taikhoan.html')));
 app.get('/setting', (req, res) => res.sendFile(path.join(__dirname, 'public', 'setting.html')));
+// Thêm đường dẫn /dt trả về file dt.html dành riêng cho điện thoại
+app.get('/dt', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dt.html')));
+
+// ==========================================
+// API TRUY VẤN & XỬ LÝ
+// ==========================================
+
+// API lấy trạng thái tổng quan (Dùng cho dt.html / check.html)
+app.get('/api/status', (req, res) => {
+    const db = loadDB();
+    const onlineList = [];
+
+    db.forEach(item => {
+        const active = activeClients.get(item.token);
+        if (active) {
+            // Che bớt tên tài khoản để ẩn danh
+            const name = item.username || 'User';
+            const hiddenName = name.length > 4 ? name.substring(0, 3) + '***' : 'User***';
+            
+            onlineList.push({
+                name: hiddenName,
+                connectedAt: active.connectedAt
+            });
+        }
+    });
+
+    res.json({
+        total: onlineList.length,
+        accounts: onlineList
+    });
+});
 
 app.post('/api/connect', async (req, res) => {
     const { token, channelId, selfMute, selfDeaf } = req.body;
