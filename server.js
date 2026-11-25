@@ -1,6 +1,11 @@
 const express = require('express');
 const { Client } = require('discord.js-selfbot-v13');
-const { joinVoiceChannel, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+const {
+    joinVoiceChannel,
+    getVoiceConnection,
+    VoiceConnectionStatus,
+    entersState
+} = require('@discordjs/voice');
 const path = require('path');
 const fs = require('fs');
 
@@ -8,57 +13,135 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const ADMIN_PASSWORD = 'Ngg'; 
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Ngg';
 const DB_FILE = path.join(__dirname, 'database.json');
 const activeClients = new Map();
 
+let dbCache = loadDB();
+let writeQueue = Promise.resolve();
+
 function loadDB() {
     if (!fs.existsSync(DB_FILE)) return [];
-    try { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (e) { return []; }
+    try {
+        const raw = fs.readFileSync(DB_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        return [];
+    }
 }
 
 function saveDB(data) {
-    try { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); } catch (e) {}
+    dbCache = data;
+    const snapshot = JSON.stringify(data, null, 2);
+    writeQueue = writeQueue
+        .then(() => fs.promises.writeFile(DB_FILE, snapshot, 'utf8'))
+        .catch(() => {});
+}
+
+function getTimestamp() {
+    return new Date().toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 }
 
 function addLog(token, message) {
-    let db = loadDB();
+    const db = [...dbCache];
     const index = db.findIndex(item => item.token === token);
-    const timestamp = new Date().toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-    const logEntry = `[${timestamp}] ${message}`;
+    if (index === -1) return;
 
-    if (index !== -1) {
-        if (!db[index].logs) db[index].logs = [];
-        db[index].logs.unshift(logEntry);
-        if (db[index].logs.length > 10) db[index].logs.pop();
-        saveDB(db);
-    }
+    const logEntry = `[${getTimestamp()}] ${message}`;
+    const currentLogs = Array.isArray(db[index].logs) ? [...db[index].logs] : [];
+    currentLogs.unshift(logEntry);
+    if (currentLogs.length > 10) currentLogs.pop();
+
+    db[index] = { ...db[index], logs: currentLogs };
+    saveDB(db);
 }
 
 function addChatLog(token, chatMsg) {
-    let db = loadDB();
+    const db = [...dbCache];
     const index = db.findIndex(item => item.token === token);
-    const timestamp = new Date().toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-    const entry = `[${timestamp}] ${chatMsg}`;
+    if (index === -1) return;
 
-    if (index !== -1) {
-        if (!db[index].chatLogs) db[index].chatLogs = [];
-        db[index].chatLogs.unshift(entry);
-        if (db[index].chatLogs.length > 25) db[index].chatLogs.pop(); // Lưu 25 tin nhắn gần nhất
-        saveDB(db);
-    }
+    const entry = `[${getTimestamp()}] ${chatMsg}`;
+    const currentChat = Array.isArray(db[index].chatLogs) ? [...db[index].chatLogs] : [];
+    currentChat.unshift(entry);
+    if (currentChat.length > 25) currentChat.pop();
+
+    db[index] = { ...db[index], chatLogs: currentChat };
+    saveDB(db);
+}
+
+function cleanupSession(token) {
+    const existing = activeClients.get(token);
+    if (!existing) return;
+
+    try {
+        if (existing.connection && existing.connection.state.status !== VoiceConnectionStatus.Destroyed) {
+            existing.connection.destroy();
+        }
+    } catch (e) {}
+
+    try {
+        if (existing.client) {
+            existing.client.removeAllListeners();
+            existing.client.destroy();
+        }
+    } catch (e) {}
+
+    activeClients.delete(token);
+}
+
+function attachVoiceListeners(token, connection, channelId, selfMute, selfDeaf) {
+    connection.on(VoiceConnectionStatus.Disconnected, async () => {
+        try {
+            await Promise.race([
+                entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+            ]);
+        } catch (err) {
+            try {
+                if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+                    connection.destroy();
+                }
+            } catch (e) {}
+
+            const current = dbCache.find(item => item.token === token);
+            if (current && activeClients.has(token)) {
+                addLog(token, 'Mất kết nối Voice, đang thử kết nối lại...');
+                connectVoice({
+                    ...current,
+                    channelId: channelId || current.channelId,
+                    selfMute: typeof selfMute === 'boolean' ? selfMute : current.selfMute,
+                    selfDeaf: typeof selfDeaf === 'boolean' ? selfDeaf : current.selfDeaf
+                });
+            }
+        }
+    });
 }
 
 async function connectVoice(config) {
     const { token, channelId, selfMute, selfDeaf, textChannelId } = config;
+    if (!token || !channelId) return;
 
-    if (activeClients.has(token)) {
-        try { 
-            const oldData = activeClients.get(token);
-            oldData.client.removeAllListeners();
-            oldData.client.destroy(); 
-        } catch (e) {}
-        activeClients.delete(token);
+    cleanupSession(token);
+
+    // Đảm bảo bản ghi tồn tại sớm để addLog/addChatLog có thể ghi nhận
+    const existingDb = [...dbCache];
+    const existingIdx = existingDb.findIndex(item => item.token === token);
+    if (existingIdx === -1) {
+        existingDb.push({
+            token,
+            channelId,
+            selfMute: Boolean(selfMute),
+            selfDeaf: Boolean(selfDeaf),
+            textChannelId: textChannelId || '',
+            userId: '',
+            username: '',
+            connectedAt: null,
+            logs: [],
+            chatLogs: []
+        });
+        saveDB(existingDb);
     }
 
     const client = new Client({
@@ -66,28 +149,27 @@ async function connectVoice(config) {
         sweepers: { messages: { interval: 120, lifetime: 60 } }
     });
 
-    client.on('ready', async () => {
+    activeClients.set(token, {
+        client,
+        connection: null,
+        connectedAt: Date.now()
+    });
+
+    client.once('ready', async () => {
         try {
             const channel = await client.channels.fetch(channelId);
             if (!channel || !channel.isVoice()) {
                 addLog(token, 'Lỗi: ID kênh thoại không hợp lệ!');
-                client.destroy();
+                cleanupSession(token);
                 return;
             }
 
-            if (client.ws.shards && client.ws.shards.first()) {
-                client.ws.shards.first().send({
-                    op: 4,
-                    d: {
-                        guild_id: channel.guild.id,
-                        channel_id: channel.id,
-                        self_mute: Boolean(selfMute),
-                        self_deaf: Boolean(selfDeaf)
-                    }
-                });
+            const existingConn = getVoiceConnection(channel.guild.id);
+            if (existingConn && existingConn.state.status !== VoiceConnectionStatus.Destroyed) {
+                existingConn.destroy();
             }
 
-            joinVoiceChannel({
+            const connection = joinVoiceChannel({
                 channelId: channel.id,
                 guildId: channel.guild.id,
                 adapterCreator: channel.guild.voiceAdapterCreator,
@@ -95,24 +177,29 @@ async function connectVoice(config) {
                 selfDeaf: Boolean(selfDeaf),
             });
 
+            attachVoiceListeners(token, connection, channel.id, Boolean(selfMute), Boolean(selfDeaf));
+            await entersState(connection, VoiceConnectionStatus.Ready, 15_000);
+
+            const connectedAt = Date.now();
             activeClients.set(token, {
-                client: client,
-                connectedAt: Date.now()
+                client,
+                connection,
+                connectedAt
             });
 
-            let db = loadDB();
+            const db = [...dbCache];
             const index = db.findIndex(item => item.token === token);
             const accountData = {
                 token,
-                channelId,
+                channelId: channel.id,
                 selfMute: Boolean(selfMute),
                 selfDeaf: Boolean(selfDeaf),
-                textChannelId: textChannelId || '',
+                textChannelId: textChannelId ?? (index !== -1 ? db[index].textChannelId || '' : ''),
                 userId: client.user.id,
                 username: client.user.tag,
-                connectedAt: Date.now(),
-                logs: index !== -1 && db[index].logs ? db[index].logs : [],
-                chatLogs: index !== -1 && db[index].chatLogs ? db[index].chatLogs : []
+                connectedAt,
+                logs: index !== -1 && Array.isArray(db[index].logs) ? db[index].logs : [],
+                chatLogs: index !== -1 && Array.isArray(db[index].chatLogs) ? db[index].chatLogs : []
             };
 
             if (index !== -1) db[index] = accountData;
@@ -120,18 +207,15 @@ async function connectVoice(config) {
             saveDB(db);
 
             addLog(token, `Thành công: Đã kết nối vào Voice [${channel.name}]`);
-
         } catch (err) {
             addLog(token, `Lỗi kết nối: ${err.message}`);
         }
     });
 
-    // Bắt tin nhắn realtime từ kênh chat được cài đặt
     client.on('messageCreate', (message) => {
-        let db = loadDB();
-        const account = db.find(item => item.token === token);
-        if (account && account.textChannelId && message.channel.id === account.textChannelId) {
-            const sender = message.author.tag;
+        const account = dbCache.find(item => item.token === token);
+        if (account && account.textChannelId && message.channel && message.channel.id === account.textChannelId) {
+            const sender = message.author ? message.author.tag : 'Unknown';
             const content = message.content || '[Tệp/Sticker/Hình ảnh]';
             addChatLog(token, `${sender}: ${content}`);
         }
@@ -141,12 +225,15 @@ async function connectVoice(config) {
         await client.login(token);
     } catch (err) {
         addLog(token, `Lỗi đăng nhập: Token hỏng hoặc đổi pass (${err.message})`);
+        cleanupSession(token);
     }
 }
 
 function restoreAllSessions() {
-    const db = loadDB();
-    db.forEach(config => connectVoice(config));
+    const db = [...dbCache];
+    db.forEach((config, i) => {
+        setTimeout(() => connectVoice(config), i * 1200);
+    });
 }
 
 // ==========================================
@@ -155,25 +242,20 @@ function restoreAllSessions() {
 app.get('/check', (req, res) => res.sendFile(path.join(__dirname, 'public', 'check.html')));
 app.get('/taikhoan', (req, res) => res.sendFile(path.join(__dirname, 'public', 'taikhoan.html')));
 app.get('/setting', (req, res) => res.sendFile(path.join(__dirname, 'public', 'setting.html')));
-// Thêm đường dẫn /dt trả về file dt.html dành riêng cho điện thoại
 app.get('/dt', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dt.html')));
 
 // ==========================================
 // API TRUY VẤN & XỬ LÝ
 // ==========================================
-
-// API lấy trạng thái tổng quan (Dùng cho dt.html / check.html)
 app.get('/api/status', (req, res) => {
-    const db = loadDB();
     const onlineList = [];
 
-    db.forEach(item => {
+    dbCache.forEach(item => {
         const active = activeClients.get(item.token);
-        if (active) {
-            // Che bớt tên tài khoản để ẩn danh
+        if (active && active.client && active.client.isReady()) {
             const name = item.username || 'User';
             const hiddenName = name.length > 4 ? name.substring(0, 3) + '***' : 'User***';
-            
+
             onlineList.push({
                 name: hiddenName,
                 connectedAt: active.connectedAt
@@ -187,20 +269,26 @@ app.get('/api/status', (req, res) => {
     });
 });
 
-app.post('/api/connect', async (req, res) => {
+app.post('/api/connect', (req, res) => {
     const { token, channelId, selfMute, selfDeaf } = req.body;
-    if (!token || !channelId) return res.status(400).json({ success: false, message: 'Thiếu Token hoặc ID Kênh!' });
+    if (!token || !channelId) {
+        return res.status(400).json({ success: false, message: 'Thiếu Token hoặc ID Kênh!' });
+    }
 
     connectVoice({ token, channelId, selfMute, selfDeaf });
-    return res.json({ success: true, message: 'Đã kết nối', settingUrl: `/setting?token=${encodeURIComponent(token)}` });
+    return res.json({
+        success: true,
+        message: 'Đã kết nối',
+        settingUrl: `/setting?token=${encodeURIComponent(token)}`
+    });
 });
 
-// Lấy thông tin cài đặt & Chat Logs
 app.post('/api/user/get-settings', (req, res) => {
     const { token } = req.body;
-    const db = loadDB();
-    const account = db.find(item => item.token === token);
-    if (!account) return res.status(404).json({ success: false, message: 'Tài khoản chưa kết nối!' });
+    const account = dbCache.find(item => item.token === token);
+    if (!account) {
+        return res.status(404).json({ success: false, message: 'Tài khoản chưa kết nối!' });
+    }
 
     const active = activeClients.get(token);
     res.json({
@@ -212,20 +300,21 @@ app.post('/api/user/get-settings', (req, res) => {
             selfMute: account.selfMute,
             selfDeaf: account.selfDeaf,
             textChannelId: account.textChannelId || '',
-            isOnline: !!active,
+            isOnline: Boolean(active && active.client && active.client.isReady()),
             logs: account.logs || [],
             chatLogs: account.chatLogs || []
         }
     });
 });
 
-// Cập nhật cấu hình
 app.post('/api/user/update-settings', (req, res) => {
     const { token, channelId, selfMute, selfDeaf, textChannelId } = req.body;
-    
-    let db = loadDB();
+
+    const db = [...dbCache];
     const index = db.findIndex(item => item.token === token);
-    if (index === -1) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản!' });
+    if (index === -1) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản!' });
+    }
 
     const updatedConfig = {
         ...db[index],
@@ -242,11 +331,9 @@ app.post('/api/user/update-settings', (req, res) => {
     res.json({ success: true, message: 'Đã lưu cấu hình!' });
 });
 
-// Gửi 1 tin nhắn trực tiếp từ Web sang Discord
 app.post('/api/user/send-message', async (req, res) => {
     const { token, message } = req.body;
-    const db = loadDB();
-    const account = db.find(item => item.token === token);
+    const account = dbCache.find(item => item.token === token);
 
     if (!account || !account.textChannelId) {
         return res.status(400).json({ success: false, message: 'Chưa cài đặt ID Kênh Chat!' });
@@ -263,10 +350,10 @@ app.post('/api/user/send-message', async (req, res) => {
             await channel.send(message);
             addChatLog(token, `[Bạn gửi]: ${message}`);
             return res.json({ success: true, message: 'Đã gửi tin nhắn!' });
-        } else {
-            addChatLog(token, `[Lỗi Gửi]: ID Kênh không phải kênh chat văn bản!`);
-            return res.status(400).json({ success: false, message: 'Kênh không hợp lệ!' });
         }
+
+        addChatLog(token, `[Lỗi Gửi]: ID Kênh không phải kênh chat văn bản!`);
+        return res.status(400).json({ success: false, message: 'Kênh không hợp lệ!' });
     } catch (err) {
         addChatLog(token, `[Lỗi Gửi]: ${err.message}`);
         return res.status(500).json({ success: false, message: `Lỗi: ${err.message}` });
@@ -275,38 +362,37 @@ app.post('/api/user/send-message', async (req, res) => {
 
 app.post('/api/disconnect', (req, res) => {
     const { token } = req.body;
-    if (activeClients.has(token)) {
-        try { 
-            const data = activeClients.get(token);
-            data.client.removeAllListeners();
-            data.client.destroy(); 
-        } catch (e) {}
-        activeClients.delete(token);
+    const existsInDb = dbCache.some(item => item.token === token);
 
-        let db = loadDB().filter(item => item.token !== token);
-        saveDB(db);
-
+    if (activeClients.has(token) || existsInDb) {
+        cleanupSession(token);
+        const filtered = dbCache.filter(item => item.token !== token);
+        saveDB(filtered);
         return res.json({ success: true, message: 'Đã ngắt kết nối' });
     }
+
     return res.status(400).json({ success: false, message: 'Tài khoản chưa kết nối!' });
 });
 
 app.post('/api/accounts-management', (req, res) => {
     const { password } = req.body;
-    if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Sai mật khẩu Admin!' });
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ success: false, message: 'Sai mật khẩu Admin!' });
+    }
 
-    const db = loadDB();
-    const list = db.map(item => {
+    const list = dbCache.map(item => {
         const active = activeClients.get(item.token);
+        const isOnline = Boolean(active && active.client && active.client.isReady());
         return {
             userId: item.userId || 'Chưa xác định',
             username: item.username || 'Chưa xác định',
             token: item.token,
-            isOnline: !!active,
-            connectedAt: active ? active.connectedAt : null,
+            isOnline,
+            connectedAt: isOnline ? active.connectedAt : null,
             logs: item.logs || []
         };
     });
+
     res.json({ success: true, total: list.length, accounts: list });
 });
 
