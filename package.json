@@ -1,6 +1,7 @@
 {
   "name": "discord-voice-treo",
-  "version": "1.1.0",
+  "version": "2.0.0",
+  "description": "Discord Voice 24/7 & Live Chat Control Panel",
   "main": "server.js",
   "engines": {
     "node": ">=20.18.0"
@@ -11,6 +12,7 @@
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
     "discord.js-selfbot-v13": "^3.7.1",
+    "dotenv": "^16.4.7",
     "express": "^5.1.0"
   }
 }
