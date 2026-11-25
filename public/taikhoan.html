@@ -2,24 +2,27 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản Lý Admin</title>
     <style>
-        body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; display: flex; justify-content: center; }
-        .card { background: #1e293b; padding: 25px; border-radius: 8px; width: 100%; max-width: 950px; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; }
-        .badge { background: #2563eb; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #334155; vertical-align: top; }
+        * { box-sizing: border-box; }
+        body { background: #0b0f19; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; margin: 0; display: flex; justify-content: center; }
+        .card { background: #161e2e; border: 1px solid #2d3748; padding: 22px; border-radius: 14px; width: 100%; max-width: 1050px; overflow-x: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; gap: 10px; flex-wrap: wrap; }
+        .badge { background: #2563eb; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 18px; min-width: 760px; }
+        th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #2d3748; vertical-align: top; font-size: 13.5px; }
         th { background: #0f172a; color: #94a3b8; }
         .status-online { color: #10b981; font-weight: bold; }
         .status-offline { color: #ef4444; font-weight: bold; }
-        .btn-action { background: #334155; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-        .btn-action:hover { background: #475569; }
-        .log-box { background: #0f172a; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 120px; overflow-y: auto; color: #cbd5e1; }
-        .login-box { text-align: center; padding: 40px 20px; }
-        input[type="password"] { padding: 10px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #fff; width: 250px; margin-right: 10px; }
-        button.btn-login { padding: 10px 20px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .user-id { color: #38bdf8; font-family: monospace; font-size: 13px; }
+        .btn-action { background: #334155; color: #fff; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 4px; margin-top: 4px; }
+        .btn-reconn { background: #0d9488; }
+        .btn-del { background: #dc2626; }
+        .log-box { background: #080c14; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 12px; max-height: 120px; overflow-y: auto; color: #cbd5e1; }
+        .login-box { text-align: center; padding: 40px 16px; }
+        input[type="password"] { padding: 11px 14px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #fff; width: 260px; max-width: 100%; margin-right: 8px; }
+        button.btn-login { padding: 11px 20px; background: #2563eb; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .user-id { color: #38bdf8; font-family: monospace; font-size: 12px; }
         .token-text { font-family: monospace; font-size: 12px; word-break: break-all; }
     </style>
 </head>
@@ -27,9 +30,9 @@
     <div class="card">
         <div id="auth-section" class="login-box">
             <h2>🔒 Yêu Cầu Quyền Admin</h2>
-            <p style="color: #94a3b8;">Nhập mật khẩu Admin để truy cập dữ liệu</p>
+            <p style="color: #94a3b8; font-size: 14px;">Nhập mật khẩu Admin để truy cập bảng điều khiển</p>
             <br>
-            <input type="password" id="adminPass" placeholder="Nhập mật khẩu Admin...">
+            <input type="password" id="adminPass" placeholder="Nhập mật khẩu Admin..." onkeydown="if(event.key==='Enter') loginAdmin()">
             <button class="btn-login" onclick="loginAdmin()">Xác nhận</button>
             <p id="error-msg" style="color: #ef4444; margin-top: 15px; display: none;"></p>
         </div>
@@ -37,15 +40,18 @@
         <div id="admin-section" style="display: none;">
             <div class="header">
                 <h2>Quản Lý Tài Khoản (Admin Panel)</h2>
-                <div class="badge">Tổng số: <span id="total">0</span> acc</div>
+                <div>
+                    <span class="badge">Tổng số: <span id="total">0</span> acc</span>
+                    <button class="btn-action" style="margin-left:8px;" onclick="logoutAdmin()">Đăng xuất</button>
+                </div>
             </div>
 
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 25%;">Tài Khoản & ID</th>
-                        <th style="width: 18%;">Thời Gian Treo</th>
-                        <th style="width: 27%;">Token</th>
+                        <th style="width: 24%;">Tài Khoản & Phòng</th>
+                        <th style="width: 18%;">Trạng Thái</th>
+                        <th style="width: 28%;">Token & Thao Tác</th>
                         <th style="width: 30%;">Lịch Sử Log / Lỗi</th>
                     </tr>
                 </thead>
@@ -55,33 +61,47 @@
     </div>
 
     <script>
-        let currentPass = '';
+        let adminToken = sessionStorage.getItem('zpa_admin_token') || '';
         let accountsData = [];
-        let revealedTokens = {}; // Lưu trạng thái ẩn/hiện token
+        let revealedTokens = {};
+        let pollTimer = null;
 
         async function loginAdmin() {
             const pass = document.getElementById('adminPass').value;
             if (!pass) return;
 
-            const res = await fetch('/api/accounts-management', {
+            const res = await fetch('/api/admin/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password: pass })
             });
-
             const data = await res.json();
+
             if (data.success) {
-                currentPass = pass;
-                document.getElementById('auth-section').style.display = 'none';
-                document.getElementById('admin-section').style.display = 'block';
-                accountsData = data.accounts;
-                renderAccounts(data);
-                setInterval(fetchAccounts, 5000);
+                adminToken = data.adminToken;
+                sessionStorage.setItem('zpa_admin_token', adminToken);
+                startDashboard();
             } else {
                 const err = document.getElementById('error-msg');
                 err.style.display = 'block';
                 err.innerText = data.message;
             }
+        }
+
+        function logoutAdmin() {
+            sessionStorage.removeItem('zpa_admin_token');
+            adminToken = '';
+            if (pollTimer) clearInterval(pollTimer);
+            document.getElementById('admin-section').style.display = 'none';
+            document.getElementById('auth-section').style.display = 'block';
+        }
+
+        function startDashboard() {
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('admin-section').style.display = 'block';
+            fetchAccounts();
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(fetchAccounts, 5000);
         }
 
         function formatUptime(ms) {
@@ -93,18 +113,37 @@
         }
 
         async function fetchAccounts() {
-            if (!currentPass) return;
+            if (!adminToken) return;
             try {
                 const res = await fetch('/api/accounts-management', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: currentPass })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminToken}`
+                    }
                 });
+                if (res.status === 401) return logoutAdmin();
+
                 const data = await res.json();
                 if (data.success) {
                     accountsData = data.accounts;
                     renderAccounts(data);
                 }
+            } catch (e) {}
+        }
+
+        async function adminAction(sessionId, action) {
+            if (action === 'delete' && !confirm('Xóa vĩnh viễn tài khoản này?')) return;
+            try {
+                await fetch('/api/admin/action', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminToken}`
+                    },
+                    body: JSON.stringify({ sessionId, action })
+                });
+                fetchAccounts();
             } catch (e) {}
         }
 
@@ -118,45 +157,41 @@
             const tbody = document.getElementById('account-list');
             tbody.innerHTML = '';
 
-            if (data.accounts.length === 0) {
+            if (!data.accounts || data.accounts.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Chưa có dữ liệu tài khoản nào.</td></tr>';
                 return;
             }
 
             data.accounts.forEach((acc, index) => {
-                const statusText = acc.isOnline 
-                    ? `<span class="status-online">🟢 Online</span><br><small style="color:#94a3b8;">${formatUptime(acc.connectedAt)}</small>` 
-                    : `<span class="status-offline">🔴 Offline</span>`;
-
-                const logsText = acc.logs.length > 0 ? acc.logs.join('<br>') : 'Chưa có ghi nhận lỗi.';
+                const statusText = acc.isOnline
+                    ? `<span class="status-online">🟢 Online</span><br><small style="color:#94a3b8;">${formatUptime(acc.connectedAt)}</small>`
+                    : `<span class="status-offline">🔴 ${acc.authFailed ? 'Token Lỗi' : 'Offline'}</span>`;
 
                 const isRevealed = !!revealedTokens[index];
-                const displayToken = isRevealed 
-                    ? acc.token 
-                    : acc.token.substring(0, 10) + '********************';
+                const rawToken = acc.token || '';
+                const displayToken = isRevealed ? rawToken : (rawToken.substring(0, 10) + '********************');
 
-                const btnText = isRevealed ? 'Ẩn Token' : 'Hiện Token';
-
-                const row = `
-                    <tr>
-                        <td>
-                            <strong>${acc.username}</strong><br>
-                            <span class="user-id">ID: ${acc.userId}</span>
-                        </td>
-                        <td>${statusText}</td>
-                        <td>
-                            <div class="token-text">${displayToken}</div>
-                            <br>
-                            <button class="btn-action" onclick="toggleTokenVisibility(${index})">${btnText}</button>
-                        </td>
-                        <td>
-                            <div class="log-box">${logsText}</div>
-                        </td>
-                    </tr>
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <strong>${acc.username}</strong><br>
+                        <span class="user-id">ID: ${acc.userId}</span><br>
+                        <small style="color:#cbd5e1;">${acc.guildName || ''} ${acc.channelName ? '/ ' + acc.channelName : ''}</small>
+                    </td>
+                    <td>${statusText}<br><small style="color:#64748b;">Reconnect: ${acc.reconnectCount || 0}</small></td>
+                    <td>
+                        <div class="token-text">${displayToken}</div>
+                        <button class="btn-action" onclick="toggleTokenVisibility(${index})">${isRevealed ? 'Ẩn' : 'Hiện'}</button>
+                        <button class="btn-action btn-reconn" onclick="adminAction('${acc.sessionId}', 'reconnect')">Reconnect</button>
+                        <button class="btn-action btn-del" onclick="adminAction('${acc.sessionId}', 'delete')">Xóa</button>
+                    </td>
+                    <td><div class="log-box">${acc.logs && acc.logs.length ? acc.logs.join('<br>') : 'Chưa có log.'}</div></td>
                 `;
-                tbody.innerHTML += row;
+                tbody.appendChild(tr);
             });
         }
+
+        if (adminToken) startDashboard();
     </script>
 </body>
 </html>
